@@ -60,7 +60,7 @@ pcall(function()
     icon.Name = "Icon"
     icon.BackgroundTransparency = 1
     icon.BorderSizePixel = 0
-    icon.Size = UDim2.fromOffset(100, 100)
+    icon.Size = UDim2.fromOffset(180, 180)
     icon.AnchorPoint = Vector2.new(0.5, 0.5)
     icon.Image = "rbxassetid://136433830518234"
     icon.ImageTransparency = 0
@@ -69,6 +69,17 @@ pcall(function()
     -- 从屏幕下方开始
     icon.Position = UDim2.new(0.5, 0, 1, 130)
     icon.Parent = startupGui
+
+    -- 启动动画刚出现时播放音效
+    local startupSound = Instance.new("Sound")
+    startupSound.Name = "ink_StartupSound"
+    startupSound.SoundId = "rbxassetid://117430703759954"
+    startupSound.Volume = 1
+    startupSound.Looped = false
+    startupSound.Parent = startupGui
+    pcall(function()
+        startupSound:Play()
+    end)
 
     local function tween(position, duration, easingStyle, easingDirection)
         local tw = TweenService:Create(
