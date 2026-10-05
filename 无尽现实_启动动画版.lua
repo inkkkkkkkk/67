@@ -35,8 +35,15 @@ end
 pcall(function()
     local TweenService = game:GetService("TweenService")
     local CoreGui = game:GetService("CoreGui")
+    local Players = game:GetService("Players")
+    local PlayerGui = Players.LocalPlayer and Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    local guiParent = PlayerGui or CoreGui
+    if typeof(gethui) == "function" then
+        local ok, hui = pcall(gethui)
+        if ok and hui then guiParent = hui end
+    end
 
-    local oldGui = CoreGui:FindFirstChild("ink_StartupIcon")
+    local oldGui = guiParent:FindFirstChild("ink_StartupIcon")
     if oldGui then
         oldGui:Destroy()
     end
@@ -47,7 +54,7 @@ pcall(function()
     startupGui.ResetOnSpawn = false
     startupGui.DisplayOrder = 999999
     startupGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    startupGui.Parent = CoreGui
+    startupGui.Parent = guiParent
 
     local icon = Instance.new("ImageLabel")
     icon.Name = "Icon"
@@ -58,8 +65,6 @@ pcall(function()
     icon.Image = "rbxassetid://136433830518234"
     icon.ImageTransparency = 0
     icon.Active = false
-    icon.Selectable = false
-    icon.AutoButtonColor = false
     icon.ZIndex = 999999
     -- 从屏幕下方开始
     icon.Position = UDim2.new(0.5, 0, 1, 130)
