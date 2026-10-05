@@ -60,7 +60,7 @@ pcall(function()
     icon.Name = "Icon"
     icon.BackgroundTransparency = 1
     icon.BorderSizePixel = 0
-    icon.Size = UDim2.fromOffset(180, 180)
+    icon.Size = UDim2.fromOffset(260, 260)
     icon.AnchorPoint = Vector2.new(0.5, 0.5)
     icon.Image = "rbxassetid://136433830518234"
     icon.ImageTransparency = 0
@@ -151,14 +151,14 @@ pcall(function()
 
         -- 模糊刚结束，立即开始移动到左下角，放在左下角原有状态栏的上方
         tween(
-            UDim2.new(0, 80, 1, -170),
+            UDim2.new(0, 130, 1, -170),
             0.9,
             Enum.EasingStyle.Quint,
             Enum.EasingDirection.InOut
         )
 
         -- 停留在这里，不销毁、不隐藏，也不参与任何交互
-        icon.Position = UDim2.new(0, 80, 1, -170)
+        icon.Position = UDim2.new(0, 130, 1, -170)
     end
 end)
 -- ==================== 启动动画结束 ====================
@@ -364,11 +364,18 @@ Z:Button({Title="复制作者副群", Callback=function() setclipboard("10638285
 
 
 local GeneralTab = D:Tab({Title="主要功能", Icon="settings"})
+
+-- 主要功能分组，让功能排列更整齐
+local MovementGroup = GeneralTab:Section({Title="移动与视角", Opened=true})
+local InteractionGroup = GeneralTab:Section({Title="交互功能", Opened=true})
+local GameGroup = GeneralTab:Section({Title="游戏功能", Opened=true})
+local OtherGroup = GeneralTab:Section({Title="其他功能", Opened=true})
+
 local LocalPlayer = game:GetService("Players").LocalPlayer
 
 local speedEnabled = false
 local speedValue = 16
-GeneralTab:Toggle({
+MovementGroup:Toggle({
     Title = "启用修改速度",
     Value = false,
     Callback = function(v)
@@ -378,7 +385,7 @@ GeneralTab:Toggle({
         if hum then hum.WalkSpeed = v and speedValue or 16 end
     end
 })
-GeneralTab:Slider({
+MovementGroup:Slider({
     Title = "修改速度",
     Value = {Min=16, Max=100, Default=16},
     Step = 1,
@@ -392,7 +399,7 @@ GeneralTab:Slider({
     end
 })
 
-GeneralTab:Button({
+MovementGroup:Button({
     Title = "飞行",
     Callback = function()
         local ok, err = pcall(function()
@@ -415,7 +422,7 @@ local function applyNoClip(state)
         end
     end
 end
-GeneralTab:Toggle({
+MovementGroup:Toggle({
     Title = "穿墙",
     Value = false,
     Callback = function(v)
@@ -437,7 +444,7 @@ local Lighting = game:GetService("Lighting")
 local originalBrightness = Lighting.Brightness
 local originalAmbient = Lighting.Ambient
 local originalOutdoorAmbient = Lighting.OutdoorAmbient
-GeneralTab:Toggle({
+MovementGroup:Toggle({
     Title = "高亮",
     Value = false,
     Callback = function(v)
@@ -453,7 +460,7 @@ GeneralTab:Toggle({
     end
 })
 
-GeneralTab:Slider({
+MovementGroup:Slider({
     Title = "视野",
     Value = {Min=60, Max=120, Default=70},
     Step = 1,
@@ -463,7 +470,7 @@ GeneralTab:Slider({
     end
 })
 
-GeneralTab:Toggle({
+MovementGroup:Toggle({
     Title = "第三人称",
     Value = false,
     Callback = function(v)
@@ -513,7 +520,7 @@ local function disableInstantProximity()
     end
     proximityChanged = {}
 end
-GeneralTab:Toggle({
+InteractionGroup:Toggle({
     Title = "瞬间交互",
     Value = false,
     Callback = function(v)
@@ -543,9 +550,9 @@ local function forceChatVisible()
     local chatWindows = CoreGui:FindFirstChild("ChatWindow")
     if chatWindows then chatWindows.Visible = true end
 end
-GeneralTab:Button({Title="强制显示聊天框", Callback=forceChatVisible})
+InteractionGroup:Button({Title="强制显示聊天框", Callback=forceChatVisible})
 
-GeneralTab:Button({Title="传送到电梯", Callback=function()
+GameGroup:Button({Title="传送到电梯", Callback=function()
     local character = LocalPlayer.Character
     local root = character and character:FindFirstChild("HumanoidRootPart")
     if root then
@@ -553,7 +560,7 @@ GeneralTab:Button({Title="传送到电梯", Callback=function()
     end
 end})
 
-GeneralTab:Button({
+GameGroup:Button({
     Title = "打开电梯",
     Callback = function()
         local rs = game:GetService("ReplicatedStorage")
@@ -564,7 +571,7 @@ GeneralTab:Button({
     end
 })
 
-GeneralTab:Toggle({
+GameGroup:Toggle({
     Title = "无限金钱",
     Value = false,
     Callback = function(v)
@@ -592,7 +599,7 @@ GeneralTab:Toggle({
 })
 
 local corpseCrashEnabled = false
-GeneralTab:Toggle({
+GameGroup:Toggle({
     Title = "尸体崩服",
     Value = false,
     Callback = function(v)
@@ -609,7 +616,7 @@ GeneralTab:Toggle({
     end
 })
 
-GeneralTab:Button({
+GameGroup:Button({
     Title = "清理尸体",
     Callback = function()
         local npcs = workspace:FindFirstChild("NPCS")
@@ -625,7 +632,7 @@ GeneralTab:Button({
     end
 })
 
-GeneralTab:Button({
+OtherGroup:Button({
     Title = "解锁三级表情",
     Callback = function()
         local player = game:GetService("Players").LocalPlayer
@@ -655,7 +662,7 @@ GeneralTab:Button({
 })
 
 local customLobbyBadgeId = ""
-GeneralTab:Button({
+OtherGroup:Button({
     Title = "自定义大厅徽章",
     Callback = function()
         local badgeId = tonumber(customLobbyBadgeId)
@@ -667,7 +674,7 @@ GeneralTab:Button({
     end
 })
 
-GeneralTab:Input({
+OtherGroup:Input({
     Title = "输入徽章ID",
     Placeholder = "请输入徽章ID",
     Callback = function(text)
