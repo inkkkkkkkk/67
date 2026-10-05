@@ -195,6 +195,12 @@ end
 
 C = D
 
+-- 顶部标签
+pcall(function()
+    C:Tag({ Title = "无尽现实", Radius = 5, Color = Color3.fromHex("#555555") })
+    C:Tag({ Title = "服务器专属", Radius = 6, Color = Color3.fromHex("#B0B0B0") })
+end)
+
 pcall(function()
     C:EditOpenButton({
         Title = "Project_ink_无尽现实",
