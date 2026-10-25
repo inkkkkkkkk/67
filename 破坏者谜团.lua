@@ -519,6 +519,88 @@ local function findSafePosition(targetHrp, baseDistance)
     return targetHrp.CFrame * CFrame.new(0, 0, baseDistance)
 end
 
+local killerRadarEnabled = false
+local sheriffRadarEnabled = false
+local radarGui = nil
+local radarSound = nil
+local radarDistance = 40 
+
+
+local function updateRadarUI(killerNear, sheriffNear)
+    local anyThreat = killerNear or sheriffNear
+
+    if anyThreat then
+        
+        if not radarGui or not radarGui.Parent then
+            radarGui = Instance.new("ScreenGui")
+            radarGui.Name = "ink_RadarWarning"
+            radarGui.ResetOnSpawn = false
+            radarGui.IgnoreGuiInset = true
+            radarGui.Parent = game:GetService("CoreGui")
+
+            local frame = Instance.new("Frame")
+            frame.Name = "RadarFrame"
+            frame.Size = UDim2.fromOffset(280, 60)
+            frame.Position = UDim2.new(1, -300, 1, -100) 
+            frame.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+            frame.BackgroundTransparency = 0.2
+            frame.BorderSizePixel = 0
+            frame.Parent = radarGui
+
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 8)
+            corner.Parent = frame
+
+            local stroke = Instance.new("UIStroke")
+            stroke.Color = Color3.fromRGB(255, 0, 0)
+            stroke.Thickness = 3
+            stroke.Parent = frame
+
+            local text = Instance.new("TextLabel")
+            text.Name = "TextLabel"
+            text.Size = UDim2.fromScale(1, 1)
+            text.BackgroundTransparency = 1
+            text.TextColor3 = Color3.fromRGB(255, 255, 255)
+            text.Font = Enum.Font.SourceSansBold
+            text.TextSize = 20
+            text.Parent = frame
+        end
+
+        
+        local textLabel = radarGui.RadarFrame.TextLabel
+        if killerNear and sheriffNear then
+            textLabel.Text = "⚠️ 警告：杀手和警长靠近！"
+        elseif killerNear then
+            textLabel.Text = "⚠️ 警告：杀手靠近！"
+        elseif sheriffNear then
+            textLabel.Text = "⚠️ 警告：警长靠近！"
+        end
+
+        
+        if not radarSound then
+            radarSound = Instance.new("Sound")
+            radarSound.Name = "ink_RadarSound"
+            radarSound.SoundId = "rbxassetid://129496339606661"
+            radarSound.Volume = 5
+            radarSound.Looped = true
+            radarSound.Parent = game:GetService("SoundService")
+        end
+        if not radarSound.IsPlaying then
+            radarSound:Play()
+        end
+    else
+        
+        if radarGui then
+            radarGui:Destroy()
+            radarGui = nil
+        end
+        if radarSound and radarSound.IsPlaying then
+            radarSound:Stop()
+        end
+    end
+end
+
+
 task.spawn(function()
     while true do
         task.wait(0.1)
@@ -544,21 +626,19 @@ task.spawn(function()
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character then
                     local enemyHrp = p.Character:FindFirstChild("HumanoidRootPart")
-                    if enemyHrp and (hrp.Position - enemyHrp.Position).Magnitude <= 10 then
+                    if enemyHrp and (hrp.Position - enemyHrp.Position).Magnitude <= radarDistance then
                         local bp = p:FindFirstChild("Backpack") or p.Character:FindFirstChildOfClass("Backpack")
                         local hasKnife = (bp and bp:FindFirstChild("Knife")) or p.Character:FindFirstChild("Knife")
                         local hasGun = (bp and bp:FindFirstChild("Gun")) or p.Character:FindFirstChild("Gun")
                         
                         
                         if hasKnife then
-                            
                             if killerRadarEnabled and (myRole == "Normal" or myRole == "Sheriff") then
                                 killerNear = true
                             end
                         end
                         
                         if hasGun then
-                            
                             if sheriffRadarEnabled and (myRole == "Normal" or myRole == "Killer") then
                                 sheriffNear = true
                             end
@@ -567,10 +647,168 @@ task.spawn(function()
                 end
             end
         end
-
         updateRadarUI(killerNear, sheriffNear)
     end
 end)
+
+MainTab:Toggle({
+    Title = "杀手靠近提示",
+    Value = false,
+    Callback = function(v)
+        killerRadarEnabled = v
+    end
+})
+
+MainTab:Toggle({
+    Title = "警长靠近提示",
+    Value = false,
+    Callback = function(v)
+        sheriffRadarEnabled = v
+    end
+})
+
+MainTab:Slider({
+    Title = "雷达检测距离",
+    Value = {Min = 10, Max = 100, Default = 40},
+    Step = 1,
+    Callback = function(v)
+        radarDistance = v
+    end
+})
+
+local autoDodgeEnabled = false
+local autoDodgeLastTime = 0
+local autoDodgeRange = 15
+
+local function doAutoDodge(reason)
+    if tick() - autoDodgeLastTime < 1.0 then return end
+    autoDodgeLastTime = tick()
+    
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    local success = false
+    local finalPos = nil
+    
+    for i = 1, 20 do
+        local angle = math.rad(math.random(0, 360))
+        local dist = math.random(20, 45)
+        
+        local testX = hrp.Position.X + math.cos(angle) * dist
+        local testZ = hrp.Position.Z + math.sin(angle) * dist
+        local rayOrigin = Vector3.new(testX, hrp.Position.Y + 30, testZ)
+        
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+        raycastParams.FilterDescendantsInstances = {char}
+        
+        local result = workspace:Raycast(rayOrigin, Vector3.new(0, -150, 0), raycastParams)
+        
+        if result then
+            local targetPos = result.Position + Vector3.new(0, 3, 0)
+            
+            local overlapParams = OverlapParams.new()
+            overlapParams.FilterType = Enum.RaycastFilterType.Exclude
+            overlapParams.FilterDescendantsInstances = {char}
+            
+            local boxSize = Vector3.new(3, 5, 3)
+            local partsInBox = workspace:GetPartBoundsInBox(CFrame.new(targetPos), boxSize, overlapParams)
+            
+            local blocked = false
+            for _, part in ipairs(partsInBox) do
+                if part.CanCollide and part.Transparency < 0.8 then
+                    blocked = true
+                    break
+                end
+            end
+            
+            if not blocked then
+                finalPos = targetPos
+                success = true
+                break
+            end
+        end
+    end
+    
+    if success and finalPos then
+        hrp.CFrame = CFrame.new(finalPos)
+        hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        window:Notify({Title = "极限闪避", Content = reason, Duration = 2})
+    else
+        window:Notify({Title = "闪避失败", Content = "周围全是墙或虚空", Duration = 2})
+    end
+end
+
+RunService.Heartbeat:Connect(function()
+    if not autoDodgeEnabled then return end
+    
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    if char:FindFirstChild("Knife") then return end
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            if p.Character:FindFirstChild("Knife") then
+                local enemyHrp = p.Character:FindFirstChild("HumanoidRootPart")
+                if enemyHrp then
+                    if (hrp.Position - enemyHrp.Position).Magnitude <= autoDodgeRange then
+                        doAutoDodge("规避持刀者 " .. p.Name)
+                        break
+                    end
+                end
+            end
+        end
+    end
+end)
+
+local function watchDodgePlayer(p)
+    if p == LocalPlayer then return end
+    local function checkKnife(char)
+       
+        local myChar = LocalPlayer.Character
+        if myChar and myChar:FindFirstChild("Knife") then return end
+        
+        if autoDodgeEnabled and char:FindFirstChild("Knife") then
+            doAutoDodge("预警: " .. p.Name .. " 拔刀")
+        end
+        char.ChildAdded:Connect(function(child)
+            local myChar2 = LocalPlayer.Character
+            if myChar2 and myChar2:FindFirstChild("Knife") then return end
+            
+            if autoDodgeEnabled and child.Name == "Knife" then
+                doAutoDodge("预警: " .. p.Name .. " 拔刀")
+            end
+        end)
+    end
+    if p.Character then checkKnife(p.Character) end
+    p.CharacterAdded:Connect(checkKnife)
+end
+
+for _, p in ipairs(Players:GetPlayers()) do watchDodgePlayer(p) end
+Players.PlayerAdded:Connect(watchDodgePlayer)
+
+MainTab:Toggle({
+    Title = "自动躲刀",
+    Value = false,
+    Callback = function(v)
+        autoDodgeEnabled = v
+        if v then
+            window:Notify({Title = "防秒杀已开启", Content = "杀手靠近时将自动瞬移", Duration = 3})
+        end
+    end
+})
+
+MainTab:Slider({
+    Title = "检测距离",
+    Value = {Min = 5, Max = 60, Default = 15},
+    Step = 1,
+    Callback = function(v)
+        autoDodgeRange = v
+    end
+})
 
 MainTab:Button({
     Title = "传送到警长旁边",
