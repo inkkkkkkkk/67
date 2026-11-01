@@ -460,6 +460,29 @@ pcall(function()
 end)
 local MainTab = window:Tab({Title = "主要功能", Icon = "settings"})
 
+MainTab:Button({
+    Title = "飞行",
+    Callback = function()
+        local success, err = pcall(function()
+            local url = "https://raw.githubusercontent.com/inkkkkkkkk/Theinkremains/refs/heads/main/%E9%A3%9E%E8%A1%8C%E8%84%9A%E6%9C%AC.lua"
+            local code = game:HttpGet(url)
+            local func = loadstring(code)
+            if func then
+                func()
+            else
+                error("loadstring 失败")
+            end
+        end)
+        
+        if not success then
+            warn("[ink_HUB] 飞行脚本加载失败: " .. tostring(err))
+            if showNotify then
+                showNotify("加载失败", "飞行脚本加载出错，请检查网络或链接", true)
+            end
+        end
+    end
+})
+
 local speedEnabled = false
 local speedValue = 16
 MainTab:Toggle({
@@ -1214,7 +1237,290 @@ MainTab:Slider({
     Callback = function(v) auraCooldown = v end
 })
 
+local autoPickupGunEnabled = false
+local isAutoPickingUp = false
+local autoPickupNoclipConn = nil
+
+local function setAutoPickupNoclip(state)
+    if state then
+        if not autoPickupNoclipConn then
+            autoPickupNoclipConn = RunService.Stepped:Connect(function()
+                local char = LocalPlayer.Character
+                if char then
+                    for _, part in ipairs(char:GetDescendants()) do
+                        if part:IsA("BasePart") and part.CanCollide then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end)
+        end
+    else
+        if autoPickupNoclipConn then
+            autoPickupNoclipConn:Disconnect()
+            autoPickupNoclipConn = nil
+        end
+        local char = LocalPlayer.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") and not part.CanCollide then
+                    part.CanCollide = true
+                end
+            end
+        end
+    end
+end
+
+MainTab:Toggle({
+    Title = "自动捡枪",
+    Value = false,
+    Callback = function(v)
+        autoPickupGunEnabled = v
+        if v then
+            showNotify("自动捡枪", "已开启，发现掉落枪械将自动拾取", false)
+        else
+            isAutoPickingUp = false
+            setAutoPickupNoclip(false)
+        end
+    end
+})
+
+task.spawn(function()
+    while task.wait(0.3) do
+        if not autoPickupGunEnabled or isAutoPickingUp then continue end
+        
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then continue end
+        
+        local backpack = LocalPlayer:FindFirstChild("Backpack") or char:FindFirstChildOfClass("Backpack")
+        local isKiller = (backpack and backpack:FindFirstChild("Knife")) or char:FindFirstChild("Knife")
+        if isKiller then continue end
+        
+        local inLobby = false
+        local lobbyCenter = Vector3.new(603.0, 467.8, 37.0)
+        local lobbyRadius = 250
+        if (hrp.Position - lobbyCenter).Magnitude <= lobbyRadius then
+            inLobby = true
+        else
+            local parent = hrp.Parent
+            while parent and parent ~= workspace do
+                if string.lower(parent.Name):find("lobby") then 
+                    inLobby = true 
+                    break 
+                end
+                parent = parent.Parent
+            end
+        end
+        if inLobby then continue end
+        
+        local targetDrop = nil
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj.Name == "GunDrop" and obj:FindFirstChild("Fire") then
+                targetDrop = obj
+                break
+            end
+        end
+        
+        if targetDrop then
+            isAutoPickingUp = true
+            local originCFrame = hrp.CFrame
+            
+            showNotify("发现掉落枪械", "正在拾取...", false)
+            setAutoPickupNoclip(true)
+            
+            task.spawn(function()
+                local pickupStartTime = tick()
+                
+                while targetDrop and targetDrop.Parent and (tick() - pickupStartTime < 5) do
+                    local currentChar = LocalPlayer.Character
+                    local currentHrp = currentChar and currentChar:FindFirstChild("HumanoidRootPart")
+                    
+                    if not currentHrp then break end
+                    
+                    local targetPart = targetDrop
+                    if not targetDrop:IsA("BasePart") then
+                        targetPart = targetDrop.PrimaryPart or targetDrop:FindFirstChildWhichIsA("BasePart")
+                    end
+                    
+                    if targetPart then
+                        local abovePos = targetPart.Position + Vector3.new(0, 3, 0)
+                        currentHrp.CFrame = CFrame.new(abovePos)
+                        
+                        if firetouchinterest then
+                            pcall(function()
+                                firetouchinterest(currentHrp, targetPart, 0)
+                                task.wait(0.02)
+                                firetouchinterest(currentHrp, targetPart, 1)
+                            end)
+                        end
+                    end
+                    task.wait(0.15)
+                end
+                
+                task.wait(0.2) 
+                
+                local finalChar = LocalPlayer.Character
+                local finalHrp = finalChar and finalChar:FindFirstChild("HumanoidRootPart")
+                if finalHrp then
+                    finalHrp.CFrame = originCFrame
+                end
+                
+                task.wait(0.3)
+                setAutoPickupNoclip(false)
+                isAutoPickingUp = false
+                
+                if finalHrp then
+                    showNotify("拾取完毕", "已返回原处", false)
+                end
+            end)
+        end
+    end
+end)
+
+local coinTeleportEnabled = false
+local isTeleportingCoin = false
+local coinNoclipConn = nil
+local coinScanRadius = 120
+local coinCooldown = 1.1
+
+local function setCoinNoclip(state)
+    if state then
+        if not coinNoclipConn then
+            coinNoclipConn = RunService.Stepped:Connect(function()
+                local char = LocalPlayer.Character
+                if char then
+                    for _, part in ipairs(char:GetDescendants()) do
+                        if part:IsA("BasePart") and part.CanCollide then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end)
+        end
+    else
+        if coinNoclipConn then
+            coinNoclipConn:Disconnect()
+            coinNoclipConn = nil
+        end
+        local char = LocalPlayer.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") and not part.CanCollide then
+                    part.CanCollide = true
+                end
+            end
+        end
+    end
+end
+
+MainTab:Toggle({
+    Title = "自动捡金币",
+    Value = false,
+    Callback = function(v)
+        coinTeleportEnabled = v
+        if v then
+            showNotify("自动捡金币", "请不要移动否则你会被踢", false)
+        else
+            isTeleportingCoin = false
+            setCoinNoclip(false)
+        end
+    end
+})
+
+task.spawn(function()
+    while task.wait(0.2) do
+        if not coinTeleportEnabled or isTeleportingCoin then continue end
+        
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then continue end
+        
+        local closestCoin = nil
+        local minDist = math.huge
+        
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj.Name == "CoinVisual" then
+                local hasTouch = false
+                local checkObj = obj
+                for i = 1, 4 do
+                    if checkObj and (checkObj:FindFirstChild("TouchInterest") or checkObj:FindFirstChildOfClass("TouchTransmitter")) then
+                        hasTouch = true
+                        break
+                    end
+                    if checkObj then checkObj = checkObj.Parent end
+                end
+                
+                if hasTouch then
+                    local targetPart = nil
+                    if obj:IsA("BasePart") then
+                        targetPart = obj
+                    else
+                        targetPart = obj:FindFirstAncestorWhichIsA("BasePart")
+                    end
+                    
+                    if targetPart then
+                        local dist = (hrp.Position - targetPart.Position).Magnitude
+                        if dist < minDist and dist <= coinScanRadius then
+                            minDist = dist
+                            closestCoin = targetPart
+                        end
+                    end
+                end
+            end
+        end
+        
+        if closestCoin then
+            isTeleportingCoin = true
+            setCoinNoclip(true)
+            
+            local abovePos = closestCoin.Position + Vector3.new(0, 2.5, 0)
+            hrp.CFrame = CFrame.new(abovePos)
+            
+            if firetouchinterest then
+                pcall(function()
+                    firetouchinterest(hrp, closestCoin, 0)
+                    task.wait(0.1) 
+                    firetouchinterest(hrp, closestCoin, 1)
+                end)
+            end
+            
+            task.wait(coinCooldown) 
+            
+            setCoinNoclip(false)
+            isTeleportingCoin = false
+        end
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function()
+    if coinTeleportEnabled then
+        isTeleportingCoin = false
+        setCoinNoclip(false)
+    end
+end)
+
 local AimTab = window:Tab({Title="自瞄", Icon="crosshair"})
+
+AimTab:Button({
+    Title = "加载警长X杀手辅助",
+    Callback = function()
+        local success, err = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/inkkkkkkkk/Theinkremains/refs/heads/main/%E7%A0%B4%E5%9D%8F%E8%80%85%E8%B0%9C%E5%9B%A2%E8%87%AA%E5%8A%A8%E6%94%BB%E5%87%BB.lua"))()
+        end)
+        
+        if success then
+            if showNotify then
+                showNotify("加载成功", "警长X杀手辅助已成功启动", false)
+            end
+        else
+            warn("[ink_HUB] 辅助加载失败：", tostring(err))
+            if showNotify then
+                showNotify("加载失败", "请检查网络或执行器报错", true)
+            end
+        end
+    end
+})
 
 local AimbotSettings = {
     Enabled = false,
@@ -1270,10 +1576,11 @@ local function isValidTarget(player)
     local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
     if not humanoid or humanoid.Health <= 0 then return false end
 
-    if AimbotSettings.TeamCheck then
-        local myHasKnife = hasTool(LocalPlayer, "Knife")
-        local targetHasKnife = hasTool(player, "Knife")
+    local myHasKnife = hasTool(LocalPlayer, "Knife")
+    local targetHasKnife = hasTool(player, "Knife")
 
+    
+    if AimbotSettings.TeamCheck then
         if myHasKnife then
             if targetHasKnife then return false end
         else
@@ -1301,7 +1608,7 @@ local function isValidTarget(player)
 
             if hitPlayer then
                 if AimbotSettings.TeamCheck then
-                    if hasTool(LocalPlayer, "Knife") and hasTool(hitPlayer, "Knife") then
+                    if myHasKnife and hasTool(hitPlayer, "Knife") then
                     else
                         return false
                     end
@@ -1350,135 +1657,10 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-local isSilentFireEnabled = false
-local silentFireCooldown = 0.25
-local lastSilentFireTime = 0
-
-RunService.Heartbeat:Connect(function()
-    if not isSilentFireEnabled then return end
-    if tick() - lastSilentFireTime < silentFireCooldown then return end
-    
-    local char = LocalPlayer.Character
-    local gun = char and char:FindFirstChild("Gun")
-    if not gun or not gun:FindFirstChild("Shoot") then return end
-
-    local camera = workspace.CurrentCamera
-    local centerPos = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
-    
-    local closestTarget = nil
-    local minDist = math.huge
-    local targetPart = nil
-    
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
-            if hasTool(p, "Knife") then
-                local head = p.Character.Head
-                local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
-                
-                if onScreen and screenPos.Z > 0 then
-                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - centerPos).Magnitude
-                    
-                    if dist <= 300 then
-                        if AimbotSettings.TeamCheck then
-                            local origin = camera.CFrame.Position
-                            local dir = head.Position - origin
-                            local raycastParams = RaycastParams.new()
-                            raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-                            raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, p.Character}
-                            
-                            local result = workspace:Raycast(origin, dir, raycastParams)
-                            if not result then
-                                if dist < minDist then
-                                    minDist = dist
-                                    closestTarget = p
-                                    targetPart = head
-                                end
-                            end
-                        else
-                            if dist < minDist then
-                                minDist = dist
-                                closestTarget = p
-                                targetPart = head
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    if closestTarget and targetPart then
-        local targetPos = targetPart.Position
-        local fakeCamCFrame = CFrame.lookAt(camera.CFrame.Position, targetPos)
-        local targetCFrame = CFrame.new(targetPos)
-        
-        pcall(function() gun:Activate() end)
-        pcall(function() gun:Shoot:FireServer(fakeCamCFrame, targetCFrame) end)
-        
-        lastSilentFireTime = tick()
-    end
-end)
-
-local isAutoThrowEnabled = false
-local throwCooldown = 2.0 
-local lastThrowTime = 0
-
-task.spawn(function()
-    while task.wait(0.1) do
-        if isAutoThrowEnabled and tick() - lastThrowTime >= throwCooldown then
-            local char = LocalPlayer.Character
-            local knife = char and char:FindFirstChild("Knife")
-            local knifeEvent = knife and knife:FindFirstChild("Events") and knife.Events:FindFirstChild("KnifeThrown")
-            
-            if knifeEvent then
-                local closestTarget = nil
-                local minDist = math.huge
-                
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
-                        local bp = p:FindFirstChild("Backpack") or p.Character:FindFirstChildOfClass("Backpack")
-                        local hasKnife = (bp and bp:FindFirstChild("Knife")) or p.Character:FindFirstChild("Knife") ~= nil
-                        
-                        if not hasKnife then
-                            local dist = (char.Head.Position - p.Character.Head.Position).Magnitude
-                            if dist < minDist then
-                                minDist = dist
-                                closestTarget = p
-                            end
-                        end
-                    end
-                end
-                
-                if closestTarget then
-                    local targetPos = closestTarget.Character.Head.Position
-                    local camera = workspace.CurrentCamera
-                    local originalCFrame = camera.CFrame
-                    local aimCFrame = CFrame.lookAt(camera.CFrame.Position, targetPos)
-                    
-                    camera.CFrame = aimCFrame
-                    task.wait(0.05)
-                    
-                    local startCFrame = camera.CFrame
-                    local targetCFrame = CFrame.new(targetPos)
-                    
-                    pcall(function()
-                        knifeEvent:FireServer(startCFrame, targetCFrame)
-                    end)
-                    
-                    camera.CFrame = originalCFrame
-                    lastThrowTime = tick()
-                end
-            end
-        end
-    end
-end)
-
 AimTab:Toggle({ Title = "开启自瞄", Value = false, Callback = function(s) AimbotSettings.Enabled = s end })
-AimTab:Toggle({ Title = "警长自动开枪", Value = false, Callback = function(s) isSilentFireEnabled = s end })
-AimTab:Toggle({ Title = "杀手自动飞刀", Value = false, Callback = function(s) isAutoThrowEnabled = s end })
-AimTab:Toggle({ Title = "队伍检测", Value = false, Callback = function(s) AimbotSettings.TeamCheck = s end })
 AimTab:Toggle({ Title = "自瞄圆圈", Value = false, Callback = function(s) AimbotSettings.CircleEnabled = s end })
 AimTab:Dropdown({ Title = "瞄准部位", Values = { "Head", "HumanoidRootPart" }, Value = "Head", Callback = function(v) AimbotSettings.TargetPart = v end })
+AimTab:Toggle({ Title = "队伍检测", Value = false, Callback = function(s) AimbotSettings.TeamCheck = s end })
 AimTab:Toggle({ Title = "墙体检测", Value = false, Callback = function(s) AimbotSettings.WallCheck = s end })
 AimTab:Slider({ Title = "圆圈大小", Value = { Min = 30, Max = 500, Default = 100 }, Callback = function(v) AimbotSettings.CircleRadius = v end })
 AimTab:Slider({ Title = "圆圈厚度", Value = { Min = 1, Max = 10, Default = 2 }, Callback = function(v) AimbotSettings.CircleThickness = v end })
